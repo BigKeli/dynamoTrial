@@ -1,6 +1,6 @@
 ### Overview
 
-This repository contains an AWS infrastructure stack named Talent.
+This repository contains an AWS infrastructure stack 
 
 ### Stack Components
 
