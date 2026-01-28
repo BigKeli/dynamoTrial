@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  Serverless HTTP API (API Gateway HTTP API -> Lambda) for session-centric marketing tracking.
+  DynamoDB single-table design with PK/SK and one GSI for session timeline reconstruction.
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+    MemorySize: 256
+    Timeout: 10
+    Tracing: Active
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+
+Parameters:
+  StageName:
+    Type: String
+    Default: prod
+    AllowedPattern: "^[a-zA-Z0-9_-]+$"
+    Description: API stage name (e.g., dev, staging, prod).
+
+  TableName:
+    Type: String
+    Default: session-tracking
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Description: DynamoDB table name.
+
+  EnablePointInTimeRecovery:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable DynamoDB point-in-time recovery.
+
+Conditions:
+  EnablePITR: !Equals [!Ref EnablePointInTimeRecovery, "true"]
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - content-type
+          - user-agent
+          - x-forwarded-for
+          - x-request-id
+          - x-session-id
+          - x-external-id
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        MaxAge: 86400
+
+  TrackingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-tracking"
+      CodeUri: ../src/lambda/
+      Handler: handler.handler
+      Description: Single entry Lambda for ingestion and retrieval of session-centric interaction data.
+      Environment:
+        Variables:
+          STAGE: !Ref StageName
+          TABLE_NAME: !Ref TrackingTable
+          GSI1_NAME: GSI1
+          PK_NAME: PK
+          SK_NAME: SK
+      Events:
+        # Session Management
+        CreateSession:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /sessions
+            Method: POST
+        UpdateSession:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /sessions/{sessionId}
+            Method: PATCH
+        GetSession:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /sessions/{sessionId}
+            Method: GET
+        GetSessionMetadata:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /sessions/{sessionId}/metadata
+            Method: GET
+        GetUserSessions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /users/{externalId}/sessions
+            Method: GET
+        DeleteSession:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /sessions/{sessionId}
+            Method: DELETE
+        # Event Tracking
+        TrackEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /events
+            Method: POST
+        TrackBatchEvents:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /events/batch
+            Method: POST
+        GetEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /events/{sessionId}/{eventId}/{timestamp}
+            Method: GET
+        UpdateEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /events/{sessionId}/{eventId}/{timestamp}
+            Method: PATCH
+        DeleteEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /events/{sessionId}/{eventId}/{timestamp}
+            Method: DELETE
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Sid: DynamoDBCrudOnTable
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:BatchWriteItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt TrackingTable.Arn
+                - !Join
+                  - ""
+                  - - !GetAtt TrackingTable.Arn
+                    - "/index/GSI1"
+
+  TrackingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification: !If
+        - EnablePITR
+        - PointInTimeRecoveryEnabled: true
+        - !Ref AWS::NoValue
+
+Outputs:
+  ApiEndpoint:
+    Description: Base URL of the deployed HTTP API stage.
+    Value: !Sub
+      - "https://${ApiId}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+      - ApiId: !Ref HttpApi
+
+  TrackingFunctionName:
+    Description: Lambda function name.
+    Value: !Ref TrackingFunction
+
+  DynamoTableName:
+    Description: DynamoDB table name.
+    Value: !Ref TrackingTable
+
+  DynamoTableArn:
+    Description: DynamoDB table ARN.
+    Value: !GetAtt TrackingTable.Arn
+
+  Gsi1Name:
+    Description: Name of the single GSI used for session timeline reconstruction.
+    Value: GSI1

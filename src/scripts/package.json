@@ -1,0 +1,24 @@
+{
+  "name": "session-tracking-scripts",
+  "version": "1.0.0",
+  "description": "Operational scripts for session tracking system",
+  "type": "module",
+  "scripts": {
+    "seed": "node seed-data.js",
+    "query": "node query-sessions.js",
+    "import": "node import-data.js",
+    "audit": "node audit-data.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "uuid": "^9.0.1"
+  },
+  "keywords": [
+    "dynamodb",
+    "seeding",
+    "operations"
+  ],
+  "author": "",
+  "license": "ISC"
+}

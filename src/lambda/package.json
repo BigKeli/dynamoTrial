@@ -1,0 +1,28 @@
+{
+  "name": "session-tracking-lambda",
+  "version": "1.0.0",
+  "description": "Serverless session-centric tracking API Lambda runtime",
+  "main": "handler.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test command\" && exit 1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "aws",
+    "lambda",
+    "dynamodb",
+    "serverless",
+    "tracking"
+  ],
+  "author": "",
+  "license": "ISC"
+}
