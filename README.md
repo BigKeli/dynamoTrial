@@ -1,6 +1,14 @@
 # Session Tracking System - Architecture Guide
 
+
+This project demonstrates DynamoDB, AWS Lambdas and AWS API Gateway knowledge. Being able to create a AWS stack infrastructure to be able to warm save and retrieve user data originating from Google Tab Manager regarding a specific websites product.
+
+Live API: https://179kz5ayv7.execute-api.us-east-1.amazonaws.com/dev
+
+
 ## 🏗️ Entity Model
+
+
 
 ### **Session**
 A user's journey on your site/app.
