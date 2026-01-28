@@ -4,7 +4,7 @@ STACK_NAME ?= session-tracking
 STAGE ?= dev
 REGION ?= us-east-1
 PROFILE ?= default
-AWS_ACCOUNT_ID ?= 033156084586
+AWS_ACCOUNT_ID ?= //add your account id here
 
 TEMPLATE := template.yaml
 PARAMS := parameters.yaml
